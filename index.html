@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Musica Ekaitz</title>
+
+<style>
+body{
+  background:#0b0f1a;
+  color:#fff;
+  font-family:Arial,sans-serif;
+  margin:0;
+  padding:0;
+}
+
+html, body {
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* FIX iOS zoom */
+input, textarea, select {
+  font-size: 16px;
+}
+
+.container{
+  max-width:1100px;
+  margin:auto;
+  padding:20px;
+  border-radius:20px;
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 0 25px rgba(0,0,0,.7);
+  background:#0b0f1a;
+}
+
+.container::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:20px;
+  padding:3px;
+  background:linear-gradient(90deg,#ff005c,#ffb400,#33ff5f,#00d2ff,#a200ff,#ff005c);
+  background-size:300% 300%;
+  animation:led 5s linear infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  z-index:0;
+}
+
+@keyframes led{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
+
+.container>*{position:relative;z-index:1}
+
+h1{text-align:center;margin-bottom:20px}
+
+.search{display:flex;justify-content:center;margin-bottom:20px}
+.search input{
+  width:60%;
+  padding:12px;
+  border-radius:12px;
+  border:none;
+  outline:none;
+  font-size:16px;
+  background:rgba(255,255,255,.1);
+}
+
+.controls{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:20px;
+}
+
+.controls button,.controls input{
+  padding:10px 15px;
+  border:none;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+.controls button{
+  background:#222;
+  color:#fff;
+  box-shadow:0 0 15px rgba(0,0,0,.6);
+}
+
+.controls input{
+  width:200px;
+  background:rgba(255,255,255,.1);
+}
+
+.music-list{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:15px;
+}
+
+.song{
+  border-radius:18px;
+  padding:16px;
+  background:rgba(255,255,255,.06);
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 0 20px rgba(0,0,0,.6);
+  border:2px solid rgba(255,255,255,.12);
+}
+
+.song::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:18px;
+  border:2px solid transparent;
+  background:linear-gradient(90deg,#ff005c,#ffb400,#33ff5f,#00d2ff,#a200ff,#ff005c);
+  background-size:300% 300%;
+  animation:led 5s linear infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  pointer-events:none;
+}
+
+.song>*{position:relative;z-index:1}
+.song h3{margin:0 0 12px;font-size:18px}
+
+.song button{
+  margin-right:10px;
+  background:#222;
+  color:#fff;
+  border-radius:12px;
+  padding:10px 12px;
+  cursor:pointer;
+}
+
+.song input[type=range]{width:100%;margin-top:12px}
+
+.indicator{
+  margin-top:20px;
+  font-size:26px;
+  font-weight:bold;
+  text-align:center;
+  padding:18px;
+  border-radius:16px;
+  background:rgba(255,255,255,.06);
+}
+
+.active{
+  border-color:#00ff5c!important;
+  box-shadow:0 0 25px rgba(0,255,92,.35);
+}
+
+.song.active input[type=range]{accent-color:red}
+</style>
+</head>
+
+<body>
+<div class="container">
+<h1>Panel de Música</h1>
+
+<div class="search">
+<input id="search" placeholder="Buscar canción...">
+</div>
+
+<div class="controls">
+<label>Volumen:
+<input id="volume" type="range" min="0" max="1" step="0.01" value="0.8">
+</label>
+<button id="loopAll">LOOP GENERAL: OFF</button>
+</div>
+
+<div class="music-list" id="musicList"></div>
+<div class="indicator" id="activeSong">Ninguna canción seleccionada</div>
+</div>
+
+<script>
+const songs = [
+"musica.mp3",
+"musica1.mp3",
+];
+
+songs.sort();
+
+let currentAudio = null;
+let loopMode = false;
+let audioList = [];
+
+const musicList = document.getElementById("musicList");
+const activeSong = document.getElementById("activeSong");
+const volume = document.getElementById("volume");
+const search = document.getElementById("search");
+const loopAll = document.getElementById("loopAll");
+
+function formatTime(sec){
+  const m = Math.floor(sec/60);
+  const s = Math.floor(sec%60);
+  return `${m}:${s<10?"0"+s:s}`;
+}
+
+function renderSongs(filter=""){
+  musicList.innerHTML = "";
+  audioList = [];
+
+  songs
+  .filter(s => s.toLowerCase().includes(filter.toLowerCase()))
+  .forEach(song => {
+
+    const div = document.createElement("div");
+    div.className = "song";
+
+    const h = document.createElement("h3");
+    h.textContent = song;
+
+    const play = document.createElement("button");
+    play.textContent = "PLAY";
+
+    const stop = document.createElement("button");
+    stop.textContent = "STOP";
+
+    const bar = document.createElement("input");
+    bar.type = "range";
+    bar.min = 0;
+    bar.max = 100;
+
+    const time = document.createElement("div");
+    time.textContent = "0:00 / 0:00";
+
+    div.append(h,play,stop,bar,time);
+    musicList.appendChild(div);
+
+    const audio = new Audio(`music/${song}`);
+    audio.volume = volume.value;
+    audio.loop = loopMode;
+
+    audioList.push(audio);
+
+    play.onclick = () => {
+      if(currentAudio && currentAudio !== audio){
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+      }
+
+      currentAudio = audio;
+      audio.loop = loopMode;
+      audio.play();
+
+      setActive(div,song);
+
+      audio.ontimeupdate = () => {
+        bar.value = (audio.currentTime / audio.duration) * 100 || 0;
+        time.textContent = `${formatTime(audio.currentTime)} / ${formatTime(audio.duration || 0)}`;
+      };
+    };
+
+    stop.onclick = () => {
+      audio.pause();
+      audio.currentTime = 0;
+      bar.value = 0;
+      clearActive();
+    };
+
+    bar.oninput = () => {
+      if(audio.duration)
+        audio.currentTime = (bar.value/100)*audio.duration;
+    };
+
+    volume.oninput = e => {
+      audio.volume = e.target.value;
+    };
+  });
+}
+
+function setActive(div,song){
+  document.querySelectorAll(".song").forEach(s => s.classList.remove("active"));
+  div.classList.add("active");
+  activeSong.textContent = `🎵 Reproduciendo: ${song}`;
+}
+
+function clearActive(){
+  document.querySelectorAll(".song").forEach(s => s.classList.remove("active"));
+  activeSong.textContent = "Ninguna canción seleccionada";
+}
+
+search.oninput = e => renderSongs(e.target.value);
+
+loopAll.onclick = () => {
+  loopMode = !loopMode;
+  loopAll.textContent = `LOOP GENERAL: ${loopMode ? "ON" : "OFF"}`;
+
+  audioList.forEach(a => a.loop = loopMode);
+};
+
+renderSongs();
+</script>
+</body>
+</html>
